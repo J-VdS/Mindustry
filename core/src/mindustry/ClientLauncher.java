@@ -17,6 +17,7 @@ import mindustry.gen.*;
 import mindustry.graphics.*;
 import mindustry.maps.*;
 import mindustry.mod.*;
+import mindustry.net.DualNet;
 import mindustry.net.Net;
 import mindustry.ui.*;
 
@@ -61,7 +62,7 @@ public abstract class ClientLauncher extends ApplicationCore implements Platform
 
         assets.load("sprites/error.png", Texture.class);
         atlas = TextureAtlas.blankAtlas();
-        Vars.net = new Net(platform.getNet());
+        Vars.net = new DualNet(platform.getNet());
         mods = new Mods();
         schematics = new Schematics();
 

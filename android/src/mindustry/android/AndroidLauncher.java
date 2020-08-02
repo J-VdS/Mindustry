@@ -5,6 +5,8 @@ import android.app.*;
 import android.content.*;
 import android.content.pm.*;
 import android.net.*;
+import android.bluetooth.*;
+
 import android.os.Build.*;
 import android.os.*;
 import android.provider.Settings.*;
@@ -35,6 +37,7 @@ public class AndroidLauncher extends AndroidApplication{
     boolean doubleScaleTablets = true;
     FileChooser chooser;
     Runnable permCallback;
+    BluetoothAdapter BT;
 
     @Override
     protected void onCreate(Bundle savedInstanceState){

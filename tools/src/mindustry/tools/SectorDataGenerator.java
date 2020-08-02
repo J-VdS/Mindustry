@@ -13,6 +13,7 @@ import mindustry.content.*;
 import mindustry.core.*;
 import mindustry.ctype.*;
 import mindustry.game.*;
+import mindustry.net.DualNet;
 import mindustry.net.Net;
 import mindustry.type.*;
 import mindustry.type.Sector.*;
@@ -31,7 +32,7 @@ public class SectorDataGenerator{
         Core.graphics = new MockGraphics();
 
         headless = true;
-        net = new Net(null);
+        net = new DualNet(null); //Net(null);
         tree = new FileTree();
         Vars.init();
         content.createBaseContent();
