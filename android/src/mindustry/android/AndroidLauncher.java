@@ -37,7 +37,6 @@ public class AndroidLauncher extends AndroidApplication{
     boolean doubleScaleTablets = true;
     FileChooser chooser;
     Runnable permCallback;
-    BluetoothAdapter BT;
 
     @Override
     protected void onCreate(Bundle savedInstanceState){

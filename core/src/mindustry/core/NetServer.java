@@ -42,7 +42,7 @@ public class NetServer implements ApplicationListener{
     /** If a player goes away of their server-side coordinates by this distance, they get teleported back. */
     private static final float correctDist = 16f;
 
-    public final Administration admins = new Administration();
+    public final DualAdministration admins = new DualAdministration();
     public final CommandHandler clientCommands = new CommandHandler("/");
     public TeamAssigner assigner = (player, players) -> {
         if(state.rules.pvp){

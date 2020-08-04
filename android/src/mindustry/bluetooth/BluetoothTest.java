@@ -1,6 +1,6 @@
 package mindustry.bluetooth;
 
-import mindustry.net.BluetoothBasic;
+import mindustry.basic.BluetoothBasic;
 
 public class BluetoothTest extends BluetoothBasic {
 
