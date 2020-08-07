@@ -1,17 +1,21 @@
 package mindustry.net;
-
-import mindustry.basic.BluetoothBasic;
+import mindustry.basic.NetBasic;
 
 /* redirect net calls */
-public class DualNet<T extends BluetoothBasic> extends Net{
-    public Boolean bluetoothMode = false;
+public class DualNet<T extends NetBasic> extends Net{
+    public boolean bluetoothMode = false;
     T BluetoothNet;
 
     public DualNet(NetProvider provider) {
         super(provider);
     }
+
     public DualNet(NetProvider provider, T t){
         super(provider);
+        this.BluetoothNet = t;
+    }
+
+    public void setBluetoothNet(T t){
         this.BluetoothNet = t;
     }
 
@@ -19,7 +23,12 @@ public class DualNet<T extends BluetoothBasic> extends Net{
         return BluetoothNet != null;
     }
 
-    public void test(){
-        BluetoothNet.hi();
+    public boolean test(){
+        if(BluetoothNet != null){
+            return BluetoothNet.BluetoothOn();
+        }else{
+            BluetoothNet.hi();
+        }
+        return false;
     }
 }

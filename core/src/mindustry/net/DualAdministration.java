@@ -10,9 +10,11 @@ public class DualAdministration<T extends AdministrationBasic> extends Administr
         super();
     }
 
+    /*
     private boolean viaBluetooth(){
         return Vars.net.bluetoothMode;
     }
+
 
     @Override
     public boolean isSubnetBanned(String ip){
@@ -29,7 +31,7 @@ public class DualAdministration<T extends AdministrationBasic> extends Administr
         }
         return banPlayerID(uuid);
     }
-
+    */
 
 
 

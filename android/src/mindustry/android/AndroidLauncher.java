@@ -19,6 +19,8 @@ import arc.scene.ui.layout.*;
 import arc.util.*;
 import arc.util.serialization.*;
 import mindustry.*;
+import mindustry.bluetooth.BluetoothNet;
+import mindustry.bluetooth.BluetoothTest;
 import mindustry.game.Saves.*;
 import mindustry.io.*;
 import mindustry.net.*;
@@ -37,6 +39,9 @@ public class AndroidLauncher extends AndroidApplication{
     boolean doubleScaleTablets = true;
     FileChooser chooser;
     Runnable permCallback;
+    //testing
+    public BluetoothTest bt;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState){
@@ -59,7 +64,15 @@ public class AndroidLauncher extends AndroidApplication{
             Scl.setAddition(0.5f);
         }
 
+        //test
+        BluetoothTest bt = new BluetoothTest(this);
+
         initialize(new ClientLauncher(){
+            @Override
+            public void setup(){
+                super.setup();
+                Vars.net.setBluetoothNet(bt);
+            }
 
             @Override
             public void hide(){
@@ -172,6 +185,8 @@ public class AndroidLauncher extends AndroidApplication{
                 t.printStackTrace();
             }
         }
+        //testing
+        this.bt = new BluetoothTest(this);
     }
 
     @Override

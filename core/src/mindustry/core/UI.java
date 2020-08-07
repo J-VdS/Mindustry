@@ -378,7 +378,6 @@ public class UI implements ApplicationListener, Loadable{
         loadfrag.hide();
         new Dialog(""){{
             String message = Strings.getFinalMesage(exc);
-
             setFillParent(true);
             cont.margin(15);
             cont.add("@error.title").colspan(2);

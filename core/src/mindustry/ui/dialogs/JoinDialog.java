@@ -34,7 +34,11 @@ public class JoinDialog extends BaseDialog{
 
         loadServers();
 
-        if(!steam) buttons.add().width(60f);
+        if(net.hasBT() || testMobile){
+            buttons.button("@bluetooth.connect", Icon.bluetoothB, () -> ui.showInfo("Bluetooth")).size(120f, 64f).width(60f);
+        }else if(!steam){
+            buttons.add().width(60f);
+        }
         buttons.add().growX().width(-1);
 
         addCloseButton();

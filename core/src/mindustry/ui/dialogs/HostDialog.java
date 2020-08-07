@@ -52,21 +52,21 @@ public class HostDialog extends BaseDialog{
 
         cont.button("?", () -> ui.showInfo("@host.info")).size(65f, 70f).padLeft(6f);
 
-        if(mobile && net.hasBT()) {
+        if(mobile && net.hasBT() || testMobile) {
             cont.row();
 
             cont.add().width(65f);
 
-            cont.button("$bluetoothHost", () -> {
+            cont.button("@bluetoothHost", () -> {
                 if (Core.settings.getString("name").trim().isEmpty()) {
-                    ui.showInfo("$noname");
+                    ui.showInfo("@noname");
                     return;
                 }
 
-                //runHostBT();
+                runHostBT();
             }).width(w).height(70f);
 
-            cont.button("?", () -> ui.showInfo("$bluetoothHost.info")).size(65f, 70f).padLeft(6f);
+            cont.button("?", () -> ui.showInfo("@bluetoothHost.info")).size(65f, 70f).padLeft(6f);
         }
 
         shown(() -> {
@@ -109,5 +109,7 @@ public class HostDialog extends BaseDialog{
     }
 
     public void runHostBT(){
+        //ui.loadfrag.show("@hosting");
+        net.test();
     }
 }

@@ -2,6 +2,7 @@ package mindustry.ui.dialogs;
 
 import arc.*;
 import arc.input.*;
+import mindustry.Vars;
 import mindustry.gen.*;
 
 import static mindustry.Vars.*;
@@ -53,7 +54,10 @@ public class PausedDialog extends BaseDialog{
             //    cont.button("@database", Icon.book, ui.database::show);
             //}
             //TODO remove
-            cont.button("nothing", Icon.warning, () -> ui.showInfo("no"));
+            cont.button("nothing", Icon.warning, () -> {
+                //ui.showInfo("no");
+                Vars.net.test();
+                });
             cont.button("@settings", Icon.settings, ui.settings::show);
 
             if(!state.rules.tutorial){
