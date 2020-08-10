@@ -28,7 +28,6 @@ public class Administration{
     private IntIntMap lastPlaced = new IntIntMap();
 
     public Administration(){
-        System.out.println("New administration");
         load();
 
         Events.on(ResetEvent.class, e -> lastPlaced = new IntIntMap());

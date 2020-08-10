@@ -19,6 +19,8 @@ public class DualNet<T extends NetBasic> extends Net{
         this.BluetoothNet = t;
     }
 
+    public boolean BTactive(){ return BluetoothNet.BTactive();}
+
     public boolean hasBT(){
         return BluetoothNet != null;
     }

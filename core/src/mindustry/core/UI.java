@@ -51,6 +51,7 @@ public class UI implements ApplicationListener, Loadable{
     public LoadDialog load;
     public DiscordDialog discord;
     public JoinDialog join;
+    public BluetoothDialog bluetooth;
     public HostDialog host;
     public PausedDialog paused;
     public SettingsMenuDialog settings;
@@ -161,6 +162,7 @@ public class UI implements ApplicationListener, Loadable{
         controls = new ControlsDialog();
         restart = new GameOverDialog();
         join = new JoinDialog();
+        bluetooth = new BluetoothDialog();
         discord = new DiscordDialog();
         load = new LoadDialog();
         custom = new CustomGameDialog();

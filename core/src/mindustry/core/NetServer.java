@@ -300,6 +300,34 @@ public class NetServer implements ApplicationListener{
             }
         });
 
+        //TODO remove
+        /*
+        clientCommands.<Player>register("uuid", "Shows java UUID", (args, player) -> {
+           player.sendMessage(java.util.UUID.randomUUID().toString());
+        });
+
+        clientCommands.<Player>register("uuid-core", "return core uuid", (args, player) -> {
+           player.sendMessage(Core.settings.getString("uuid"));
+           try {
+               java.util.UUID test = java.util.UUID.fromString(Core.settings.getString("uuid"));
+               player.sendMessage("Valid");
+           } catch(Exception _){
+               player.sendMessage("invalid");
+           }
+
+            try {
+                java.util.UUID test = java.util.UUID.nameUUIDFromBytes(Core.settings.getString("uuid").getBytes());
+                player.sendMessage(test.toString());
+                //player.sendMessage("Valid");
+            } catch(Exception _){
+                player.sendMessage("invalid");
+            }
+
+
+        });
+
+         */
+
         //duration of a a kick in seconds
         int kickDuration = 60 * 60;
         //voting round duration in seconds
