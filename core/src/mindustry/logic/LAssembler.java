@@ -2,48 +2,32 @@ package mindustry.logic;
 
 import arc.func.*;
 import arc.struct.*;
-import arc.util.ArcAnnotate.*;
+import arc.util.*;
 import mindustry.*;
 import mindustry.gen.*;
 import mindustry.logic.LExecutor.*;
 import mindustry.logic.LStatements.*;
-import mindustry.type.*;
-import mindustry.world.blocks.logic.*;
 
 /** "Compiles" a sequence of statements into instructions. */
 public class LAssembler{
     public static ObjectMap<String, Func<String[], LStatement>> customParsers = new ObjectMap<>();
+    public static final int maxTokenLength = 36;
 
     private int lastVar;
     /** Maps names to variable IDs. */
-    ObjectMap<String, BVar> vars = new ObjectMap<>();
+    public ObjectMap<String, BVar> vars = new ObjectMap<>();
     /** All instructions to be executed. */
-    LInstruction[] instructions;
+    public LInstruction[] instructions;
 
     public LAssembler(){
+        //instruction counter
         putVar("@counter").value = 0;
+        //unix timestamp
         putConst("@time", 0);
-
-        //add default constants
-        putConst("false", 0);
-        putConst("true", 1);
-        putConst("null", null);
-
-        //store base content (TODO hacky?)
-
-        for(Item item : Vars.content.items()){
-            putConst("@" + item.name, item);
-        }
-
-        for(Liquid liquid : Vars.content.liquids()){
-            putConst("@" + liquid.name, liquid);
-        }
-
-        //store sensor constants
-
-        for(LAccess sensor : LAccess.all){
-            putConst("@" + sensor.name(), sensor);
-        }
+        //currently controlled unit
+        putConst("@unit", null);
+        //reference to self
+        putConst("@this", null);
     }
 
     public static LAssembler assemble(String data, int maxInstructions){
@@ -66,7 +50,7 @@ public class LAssembler{
     }
 
     public static Seq<LStatement> read(String data){
-        return read(data, LogicBlock.maxInstructions);
+        return read(data, LExecutor.maxInstructions);
     }
 
     public static Seq<LStatement> read(String data, int max){
@@ -74,13 +58,19 @@ public class LAssembler{
         if(data == null || data.isEmpty()) return new Seq<>();
 
         Seq<LStatement> statements = new Seq<>();
-        String[] lines = data.split("[;\n]+");
+        String[] lines = data.split("\n");
         int index = 0;
         for(String line : lines){
             //comments
-            if(line.startsWith("#")) continue;
+            int commentIdx = line.indexOf('#');
+            if(commentIdx != -1) line = line.substring(0, commentIdx).trim();
+            if(line.isEmpty()) continue;
+            //remove trailing semicolons in case someone adds them in for no reason
+            if(line.endsWith(";")) line = line.substring(0, line.length() - 1);
 
             if(index++ > max) break;
+
+            line = line.replace("\t", "").trim();
 
             try{
                 String[] arr;
@@ -96,7 +86,7 @@ public class LAssembler{
                         if(c == '"'){
                             inString = !inString;
                         }else if(c == ' ' && !inString){
-                            tokens.add(line.substring(lastIdx, i).replace("\\n", "\n"));
+                            tokens.add(line.substring(lastIdx, Math.min(i, lastIdx + maxTokenLength)));
                             lastIdx = i + 1;
                         }
                     }
@@ -104,6 +94,32 @@ public class LAssembler{
                     arr = tokens.toArray(String.class);
                 }else{
                     arr = new String[]{line};
+                }
+
+                String type = arr[0];
+
+                //legacy stuff
+                if(type.equals("bop")){
+                    arr[0] = "op";
+
+                    //field order for bop used to be op a, b, result, but now it's op result a b
+                    String res = arr[4];
+                    arr[4] = arr[3];
+                    arr[3] = arr[2];
+                    arr[2] = res;
+                }else if(type.equals("uop")){
+                    arr[0] = "op";
+
+                    if(arr[1].equals("negate")){
+                        arr = new String[]{
+                            "op", "mul", arr[3], arr[2], "-1"
+                        };
+                    }else{
+                        //field order for uop used to be op a, result, but now it's op result a
+                        String res = arr[3];
+                        arr[3] = arr[2];
+                        arr[2] = res;
+                    }
                 }
 
                 LStatement st = LogicIO.read(arr);
@@ -121,6 +137,7 @@ public class LAssembler{
                     }
                 }
             }catch(Exception parseFailed){
+                parseFailed.printStackTrace();
                 //when parsing fails, add a dummy invalid statement
                 statements.add(new InvalidStatement());
             }
@@ -131,21 +148,39 @@ public class LAssembler{
     /** @return a variable ID by name.
      * This may be a constant variable referring to a number or object. */
     public int var(String symbol){
+        int constId = Vars.constants.get(symbol);
+        if(constId > 0){
+            //global constants are *negated* and stored separately
+            return -constId;
+        }
+
         symbol = symbol.trim();
 
         //string case
         if(symbol.startsWith("\"") && symbol.endsWith("\"")){
-            return putConst("___" + symbol, symbol.substring(1, symbol.length() - 1)).id;
+            return putConst("___" + symbol, symbol.substring(1, symbol.length() - 1).replace("\\n", "\n")).id;
         }
 
+        //remove spaces for non-strings
+        symbol = symbol.replace(' ', '_');
+
         try{
-            double value = Double.parseDouble(symbol);
+            double value = parseDouble(symbol);
+            if(Double.isNaN(value) || Double.isInfinite(value)) value = 0;
+
             //this creates a hidden const variable with the specified value
-            String key = "___" + value;
-            return putConst(key, value).id;
+            return putConst("___" + value, value).id;
         }catch(NumberFormatException e){
             return putVar(symbol).id;
         }
+    }
+
+    double parseDouble(String symbol) throws NumberFormatException{
+        //parse hex/binary syntax
+        if(symbol.startsWith("0b")) return Long.parseLong(symbol.substring(2), 2);
+        if(symbol.startsWith("0x")) return Long.parseLong(symbol.substring(2), 16);
+
+        return Double.parseDouble(symbol);
     }
 
     /** Adds a constant value by name. */
@@ -167,7 +202,8 @@ public class LAssembler{
         }
     }
 
-    public @Nullable BVar getVar(String name){
+    @Nullable
+    public BVar getVar(String name){
         return vars.get(name);
     }
 

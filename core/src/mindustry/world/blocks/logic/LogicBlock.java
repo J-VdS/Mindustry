@@ -8,6 +8,8 @@ import arc.struct.*;
 import arc.util.*;
 import arc.util.io.*;
 import mindustry.*;
+import mindustry.ai.types.*;
+import mindustry.core.*;
 import mindustry.gen.*;
 import mindustry.graphics.*;
 import mindustry.io.*;
@@ -16,7 +18,8 @@ import mindustry.logic.LAssembler.*;
 import mindustry.logic.LExecutor.*;
 import mindustry.ui.*;
 import mindustry.world.*;
-import mindustry.world.blocks.BuildBlock.*;
+import mindustry.world.blocks.ConstructBlock.*;
+import mindustry.world.meta.*;
 
 import java.io.*;
 import java.util.zip.*;
@@ -24,7 +27,7 @@ import java.util.zip.*;
 import static mindustry.Vars.*;
 
 public class LogicBlock extends Block{
-    public static final int maxInstructions = 2000;
+    private static final int maxByteLen = 1024 * 500;
 
     public int maxInstructionScale = 5;
     public int instructionsPerTick = 1;
@@ -35,6 +38,7 @@ public class LogicBlock extends Block{
         update = true;
         solid = true;
         configurable = true;
+        group = BlockGroup.logic;
 
         config(byte[].class, (LogicBuild build, byte[] data) -> build.readCompressed(data, true));
 
@@ -64,12 +68,12 @@ public class LogicBlock extends Block{
         });
     }
 
-    static String getLinkName(Block block){
+    public static String getLinkName(Block block){
         String name = block.name;
         if(name.contains("-")){
             String[] split = name.split("-");
             //filter out 'large' at the end of block names
-            if(split.length >= 2 && split[split.length - 1].equals("large")){
+            if(split.length >= 2 && (split[split.length - 1].equals("large") || Strings.canParseFloat(split[split.length - 1]))){
                 name = split[split.length - 2];
             }else{
                 name = split[split.length - 1];
@@ -78,11 +82,11 @@ public class LogicBlock extends Block{
         return name;
     }
 
-    static byte[] compress(String code, Seq<LogicLink> links){
+    public static byte[] compress(String code, Seq<LogicLink> links){
         return compress(code.getBytes(charset), links);
     }
 
-    static byte[] compress(byte[] bytes, Seq<LogicLink> links){
+    public static byte[] compress(byte[] bytes, Seq<LogicLink> links){
         try{
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             DataOutputStream stream = new DataOutputStream(new DeflaterOutputStream(baos));
@@ -114,15 +118,30 @@ public class LogicBlock extends Block{
     }
 
     @Override
+    public void setStats(){
+        super.setStats();
+
+        stats.add(Stat.linkRange, range / 8, StatUnit.blocks);
+        stats.add(Stat.instructions, instructionsPerTick * 60, StatUnit.perSecond);
+    }
+
+    @Override
+    public void drawPlace(int x, int y, int rotation, boolean valid){
+        Drawf.circles(x*tilesize + offset, y*tilesize + offset, range);
+    }
+
+    @Override
     public Object pointConfig(Object config, Cons<Point2> transformer){
-        if(config instanceof byte[]){
-            byte[] data = (byte[])config;
+        if(config instanceof byte[] data){
 
             try(DataInputStream stream = new DataInputStream(new InflaterInputStream(new ByteArrayInputStream(data)))){
                 //discard version for now
                 stream.read();
 
                 int bytelen = stream.readInt();
+
+                if(bytelen > maxByteLen) throw new RuntimeException("Malformed logic data! Length: " + bytelen);
+
                 byte[] bytes = new byte[bytelen];
                 stream.readFully(bytes);
 
@@ -134,7 +153,11 @@ public class LogicBlock extends Block{
                     String name = stream.readUTF();
                     short x = stream.readShort(), y = stream.readShort();
 
-                    transformer.get(Tmp.p1.set(x, y));
+                    Tmp.p2.set((int)(offset / (tilesize/2)), (int)(offset / (tilesize/2)));
+                    transformer.get(Tmp.p1.set(x * 2, y * 2).sub(Tmp.p2));
+                    Tmp.p1.add(Tmp.p2);
+                    Tmp.p1.x /= 2;
+                    Tmp.p1.y /= 2;
                     links.add(new LogicLink(Tmp.p1.x, Tmp.p1.y, name, true));
                 }
 
@@ -171,6 +194,7 @@ public class LogicBlock extends Block{
         public LExecutor executor = new LExecutor();
         public float accumulator = 0;
         public Seq<LogicLink> links = new Seq<>();
+        public boolean checkedDuplicates = false;
 
         public void readCompressed(byte[] data, boolean relative){
             DataInputStream stream = new DataInputStream(new InflaterInputStream(new ByteArrayInputStream(data)));
@@ -179,6 +203,7 @@ public class LogicBlock extends Block{
                 int version = stream.read();
 
                 int bytelen = stream.readInt();
+                if(bytelen > maxByteLen) throw new RuntimeException("Malformed logic data! Length: " + bytelen);
                 byte[] bytes = new byte[bytelen];
                 stream.readFully(bytes);
 
@@ -193,7 +218,6 @@ public class LogicBlock extends Block{
                         stream.readInt();
                     }
                 }else{
-
                     for(int i = 0; i < total; i++){
                         String name = stream.readUTF();
                         short x = stream.readShort(), y = stream.readShort();
@@ -202,6 +226,16 @@ public class LogicBlock extends Block{
                             x += tileX();
                             y += tileY();
                         }
+
+                        Building build = world.build(x, y);
+
+                        if(build != null){
+                            String bestName = getLinkName(build.block);
+                            if(!name.startsWith(bestName)){
+                                name = findLinkName(build.block);
+                            }
+                        }
+
                         links.add(new LogicLink(x, y, name, validLink(world.build(x, y))));
                     }
                 }
@@ -257,7 +291,7 @@ public class LogicBlock extends Block{
 
                 try{
                     //create assembler to store extra variables
-                    LAssembler asm = LAssembler.assemble(str, maxInstructions);
+                    LAssembler asm = LAssembler.assemble(str, LExecutor.maxInstructions);
 
                     //store connections
                     for(LogicLink link : links){
@@ -268,40 +302,45 @@ public class LogicBlock extends Block{
 
                     //store link objects
                     executor.links = new Building[links.count(l -> l.valid && l.active)];
+                    executor.linkIds.clear();
                     int index = 0;
                     for(LogicLink link : links){
                         if(link.active && link.valid){
-                            executor.links[index ++] = world.build(link.x, link.y);
+                            Building build = world.build(link.x, link.y);
+                            executor.links[index ++] = build;
+                            if(build != null) executor.linkIds.add(build.id);
                         }
                     }
 
+                    asm.putConst("@mapw", world.width());
+                    asm.putConst("@maph", world.height());
                     asm.putConst("@links", executor.links.length);
-
-                    //store any older variables
-                    for(Var var : executor.vars){
-                        if(!var.constant){
-                            BVar dest = asm.getVar(var.name);
-                            if(dest != null && !dest.constant){
-                                dest.value = var.isobj ? var.objval : var.numval;
-                            }
-                        }
-                    }
+                    asm.putConst("@ipt", instructionsPerTick);
 
                     //inject any extra variables
                     if(assemble != null){
                         assemble.get(asm);
                     }
 
-                    asm.putConst("@this", this);
+                    asm.getVar("@this").value = this;
+                    asm.putConst("@thisx", World.conv(x));
+                    asm.putConst("@thisy", World.conv(y));
 
                     executor.load(asm);
                 }catch(Exception e){
-                    e.printStackTrace();
+                    Log.err("Failed to compile logic program @", code);
+                    Log.err(e);
 
                     //handle malformed code and replace it with nothing
-                    executor.load("", maxInstructions);
+                    executor.load("", LExecutor.maxInstructions);
                 }
             }
+        }
+
+        //logic blocks cause write problems when picked up
+        @Override
+        public boolean canPickup(){
+            return false;
         }
 
         @Override
@@ -311,22 +350,48 @@ public class LogicBlock extends Block{
 
         @Override
         public void updateTile(){
+            executor.team = team;
+
+            if(!checkedDuplicates){
+                checkedDuplicates = true;
+                var removal = new IntSet();
+                var removeLinks = new Seq<LogicLink>();
+                for(var link : links){
+                    var build = world.build(link.x, link.y);
+                    if(build != null){
+                        if(!removal.add(build.id)){
+                            removeLinks.add(link);
+                        }
+                    }
+                }
+                links.removeAll(removeLinks);
+            }
 
             //check for previously invalid links to add after configuration
             boolean changed = false;
 
-            for(LogicLink l : links){
+            for(int i = 0; i < links.size; i++){
+                LogicLink l = links.get(i);
+
                 if(!l.active) continue;
 
                 boolean valid = validLink(world.build(l.x, l.y));
-                if(valid != l.valid ){
+                if(valid != l.valid){
                     changed = true;
                     l.valid = valid;
                     if(valid){
+                        Building lbuild = world.build(l.x, l.y);
+
                         //this prevents conflicts
                         l.name = "";
                         //finds a new matching name after toggling
-                        l.name = findLinkName(world.build(l.x, l.y).block);
+                        l.name = findLinkName(lbuild.block);
+
+                        //remove redundant links
+                        links.removeAll(o -> world.build(o.x, o.y) == lbuild && o != l);
+
+                        //break to prevent concurrent modification
+                        break;
                     }
                 }
             }
@@ -335,15 +400,17 @@ public class LogicBlock extends Block{
                 updateCode();
             }
 
-            accumulator += edelta() * instructionsPerTick;
+            if(enabled){
+                accumulator += edelta() * instructionsPerTick * (consValid() ? 1 : 0);
 
-            if(accumulator > maxInstructionScale * instructionsPerTick) accumulator = maxInstructionScale * instructionsPerTick;
+                if(accumulator > maxInstructionScale * instructionsPerTick) accumulator = maxInstructionScale * instructionsPerTick;
 
-            for(int i = 0; i < (int)accumulator; i++){
-                if(executor.initialized()){
-                    executor.runOnce();
+                for(int i = 0; i < (int)accumulator; i++){
+                    if(executor.initialized()){
+                        executor.runOnce();
+                    }
+                    accumulator --;
                 }
-                accumulator --;
             }
         }
 
@@ -385,31 +452,22 @@ public class LogicBlock extends Block{
             }
         }
 
-        public boolean validLink(Building other){
-            return other != null && other.isValid() && other.team == team && other.within(this, range + other.block.size*tilesize/2f) && !(other instanceof BuildEntity);
-        }
-
         @Override
         public void drawSelect(){
+            Groups.unit.each(u -> u.controller() instanceof LogicAI ai && ai.controller == this, unit -> {
+                Drawf.square(unit.x, unit.y, unit.hitSize, unit.rotation + 45);
+            });
+        }
 
+        public boolean validLink(Building other){
+            return other != null && other.isValid() && other.team == team && other.within(this, range + other.block.size*tilesize/2f) && !(other instanceof ConstructBuild);
         }
 
         @Override
         public void buildConfiguration(Table table){
-            Table cont = new Table();
-            cont.defaults().size(40);
-
-            cont.button(Icon.pencil, Styles.clearTransi, () -> {
-                Vars.ui.logic.show(code, code -> {
-                    configure(compress(code, relativeConnections()));
-                });
-            });
-
-            //cont.button(Icon.refreshSmall, Styles.clearTransi, () -> {
-
-            //});
-
-            table.add(cont);
+            table.button(Icon.pencil, Styles.clearTransi, () -> {
+                Vars.ui.logic.show(code, code -> configure(compress(code, relativeConnections())));
+            }).size(40);
         }
 
         @Override
@@ -471,7 +529,6 @@ public class LogicBlock extends Block{
                 read.b(bytes);
                 readCompressed(bytes, false);
             }else{
-
                 code = read.str();
                 links.clear();
                 short total = read.s();
@@ -508,19 +565,6 @@ public class LogicBlock extends Block{
                     }
                 }
             });
-        }
-    }
-
-    public static class LogicConfig{
-        public String code;
-        public IntSeq connections;
-
-        public LogicConfig(String code, IntSeq connections){
-            this.code = code;
-            this.connections = connections;
-        }
-
-        public LogicConfig(){
         }
     }
 }

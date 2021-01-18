@@ -16,7 +16,7 @@ import mindustry.world.meta.*;
 import static mindustry.Vars.*;
 
 public class RepairPoint extends Block{
-    private static final Rect rect = new Rect();
+    static final Rect rect = new Rect();
 
     public int timerTarget = timers++;
 
@@ -42,7 +42,7 @@ public class RepairPoint extends Block{
     @Override
     public void setStats(){
         super.setStats();
-        stats.add(BlockStat.range, repairRadius / tilesize, StatUnit.blocks);
+        stats.add(Stat.range, repairRadius / tilesize, StatUnit.blocks);
     }
 
     @Override
@@ -70,10 +70,11 @@ public class RepairPoint extends Block{
             Draw.rect(baseRegion, x, y);
 
             Draw.z(Layer.turret);
+            Drawf.shadow(region, x - (size / 2f), y - (size / 2f), rotation - 90);
             Draw.rect(region, x, y, rotation - 90);
 
             if(target != null && Angles.angleDist(angleTo(target), rotation) < 30f){
-                Draw.z(Layer.power);
+                Draw.z(Layer.flyingUnit + 1); //above all units
                 float ang = angleTo(target);
                 float len = 5f;
 
@@ -115,7 +116,12 @@ public class RepairPoint extends Block{
 
         @Override
         public boolean shouldConsume(){
-            return target != null;
+            return target != null && enabled;
+        }
+
+        @Override
+        public BlockStatus status(){
+            return Mathf.equal(efficiency(), 0f, 0.01f) ? BlockStatus.noInput : cons.status();
         }
     }
 }

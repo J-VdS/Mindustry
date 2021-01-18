@@ -21,6 +21,7 @@ public class PowerDiode extends Block{
         solid = true;
         insulated = true;
         group = BlockGroup.power;
+        noUpdateDisabled = true;
     }
 
     @Override
@@ -39,7 +40,7 @@ public class PowerDiode extends Block{
 
     // battery % of the graph on either side, defaults to zero
     public float bar(Building tile){
-        return (tile != null && tile.block().hasPower) ? tile.power.graph.getLastPowerStored() / tile.power.graph.getTotalBatteryCapacity() : 0f;
+        return (tile != null && tile.block.hasPower) ? tile.power.graph.getLastPowerStored() / tile.power.graph.getTotalBatteryCapacity() : 0f;
     }
 
     public class PowerDiodeBuild extends Building{
@@ -53,7 +54,7 @@ public class PowerDiode extends Block{
         public void updateTile(){
             super.updateTile();
 
-            if(front() == null || back() == null || !back().block().hasPower || !front().block().hasPower || back().team() != front().team()) return;
+            if(front() == null || back() == null || !back().block.hasPower || !front().block.hasPower || back().team != front().team) return;
 
             PowerGraph backGraph = back().power.graph;
             PowerGraph frontGraph = front().power.graph;
@@ -64,14 +65,14 @@ public class PowerDiode extends Block{
             float frontStored = frontGraph.getBatteryStored() / frontGraph.getTotalBatteryCapacity();
 
             // try to send if the back side has more % capacity stored than the front side
-            if(backStored > frontStored) {
+            if(backStored > frontStored){
                 // send half of the difference
                 float amount = backGraph.getBatteryStored() * (backStored - frontStored) / 2;
                 // prevent sending more than the front can handle
                 amount = Mathf.clamp(amount, 0, frontGraph.getTotalBatteryCapacity() * (1 - frontStored));
 
-                backGraph.useBatteries(amount);
-                frontGraph.chargeBatteries(amount);
+                backGraph.transferPower(-amount);
+                frontGraph.transferPower(amount);
             }
         }
     }

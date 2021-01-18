@@ -23,7 +23,7 @@ import static mindustry.Vars.*;
 
 /** Handles control of bleeding edge builds. */
 public class BeControl{
-    private static final int updateInterval = 60 * 1;
+    private static final int updateInterval = 60;
 
     private AsyncExecutor executor = new AsyncExecutor(1);
     private boolean checkUpdates = true;
@@ -43,6 +43,19 @@ public class BeControl{
                     checkUpdate(t -> {});
                 }
             }, updateInterval, updateInterval);
+        }
+
+        if(System.getProperties().containsKey("becopy")){
+            try{
+                Fi dest = Fi.get(System.getProperty("becopy"));
+                Fi self = Fi.get(BeControl.class.getProtectionDomain().getCodeSource().getLocation().toURI().getPath());
+                
+                for(Fi file : self.parent().findAll(f -> !f.equals(self))) file.delete();
+
+                self.copyTo(dest);
+            }catch(Throwable e){
+                e.printStackTrace();
+            }
         }
     }
 
@@ -68,13 +81,7 @@ public class BeControl{
             }else{
                 Core.app.post(() -> done.get(false));
             }
-        }, error -> Core.app.post(() -> {
-            if(!headless){
-                ui.showException(error);
-            }else{
-                error.printStackTrace();
-            }
-        }));
+        }, error -> {}); //ignore errors
     }
 
     /** @return whether a new update is available */
@@ -89,31 +96,41 @@ public class BeControl{
         if(!headless){
             checkUpdates = false;
             ui.showCustomConfirm(Core.bundle.format("be.update", "") + " " + updateBuild, "@be.update.confirm", "@ok", "@be.ignore", () -> {
-                boolean[] cancel = {false};
-                float[] progress = {0};
-                int[] length = {0};
-                Fi file = bebuildDirectory.child("client-be-" + updateBuild + ".jar");
+                try{
+                    boolean[] cancel = {false};
+                    float[] progress = {0};
+                    int[] length = {0};
+                    Fi file = bebuildDirectory.child("client-be-" + updateBuild + ".jar");
+                    Fi fileDest = System.getProperties().contains("becopy") ?
+                        Fi.get(System.getProperty("becopy")) :
+                        Fi.get(BeControl.class.getProtectionDomain().getCodeSource().getLocation().toURI().getPath());
 
-                BaseDialog dialog = new BaseDialog("@be.updating");
-                download(updateUrl, file, i -> length[0] = i, v -> progress[0] = v, () -> cancel[0], () -> {
-                    try{
-                        Runtime.getRuntime().exec(new String[]{"java", "-DlastBuild=" + Version.build, "-Dberestart", "-jar", file.absolutePath()});
-                        System.exit(0);
-                    }catch(IOException e){
+                    BaseDialog dialog = new BaseDialog("@be.updating");
+                    download(updateUrl, file, i -> length[0] = i, v -> progress[0] = v, () -> cancel[0], () -> {
+                        try{
+                            Runtime.getRuntime().exec(OS.isMac ?
+                                new String[]{"java", "-XstartOnFirstThread", "-DlastBuild=" + Version.build, "-Dberestart", "-Dbecopy=" + fileDest.absolutePath(), "-jar", file.absolutePath()} :
+                                new String[]{"java", "-DlastBuild=" + Version.build, "-Dberestart", "-Dbecopy=" + fileDest.absolutePath(), "-jar", file.absolutePath()}
+                            );
+                            System.exit(0);
+                        }catch(IOException e){
+                            ui.showException(e);
+                        }
+                    }, e -> {
+                        dialog.hide();
                         ui.showException(e);
-                    }
-                }, e -> {
-                    dialog.hide();
-                    ui.showException(e);
-                });
+                    });
 
-                dialog.cont.add(new Bar(() -> length[0] == 0 ? Core.bundle.get("be.updating") : (int)(progress[0] * length[0]) / 1024/ 1024 + "/" + length[0]/1024/1024 + " MB", () -> Pal.accent, () -> progress[0])).width(400f).height(70f);
-                dialog.buttons.button("@cancel", Icon.cancel, () -> {
-                    cancel[0] = true;
-                    dialog.hide();
-                }).size(210f, 64f);
-                dialog.setFillParent(false);
-                dialog.show();
+                    dialog.cont.add(new Bar(() -> length[0] == 0 ? Core.bundle.get("be.updating") : (int)(progress[0] * length[0]) / 1024/ 1024 + "/" + length[0]/1024/1024 + " MB", () -> Pal.accent, () -> progress[0])).width(400f).height(70f);
+                    dialog.buttons.button("@cancel", Icon.cancel, () -> {
+                        cancel[0] = true;
+                        dialog.hide();
+                    }).size(210f, 64f);
+                    dialog.setFillParent(false);
+                    dialog.show();
+                }catch(Exception e){
+                    ui.showException(e);
+                }
             }, () -> checkUpdates = false);
         }else{
             Log.info("&lcA new update is available: &lyBleeding Edge build @", updateBuild);
@@ -132,6 +149,7 @@ public class BeControl{
                     () -> Core.app.post(() -> {
                         Log.info("&lcSaving...");
                         SaveIO.save(saveDirectory.child("autosavebe." + saveExtension));
+                        Log.info("&lcAutosaved.");
 
                         netServer.kickAll(KickReason.serverRestarting);
                         Threads.sleep(32);

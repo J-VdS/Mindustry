@@ -5,6 +5,7 @@ import arc.graphics.*;
 import arc.graphics.g2d.*;
 import arc.math.*;
 import arc.math.geom.*;
+import arc.struct.*;
 import arc.util.*;
 import arc.util.io.*;
 import mindustry.annotations.Annotations.*;
@@ -47,6 +48,7 @@ public class NuclearReactor extends PowerGenerator{
         hasItems = true;
         hasLiquids = true;
         rebuildable = false;
+        flags = EnumSet.of(BlockFlag.reactor);
     }
 
     @Override
@@ -54,7 +56,7 @@ public class NuclearReactor extends PowerGenerator{
         super.setStats();
 
         if(hasItems){
-            stats.add(BlockStat.productionTime, itemDuration / 60f, StatUnit.seconds);
+            stats.add(Stat.productionTime, itemDuration / 60f, StatUnit.seconds);
         }
     }
 
@@ -70,18 +72,20 @@ public class NuclearReactor extends PowerGenerator{
         @Override
         public void updateTile(){
             ConsumeLiquid cliquid = consumes.get(ConsumeType.liquid);
-            Item item = consumes.<ConsumeItems>get(ConsumeType.item).items[0].item;
+            Item item = consumes.getItem().items[0].item;
 
             int fuel = items.get(item);
             float fullness = (float)fuel / itemCapacity;
             productionEfficiency = fullness;
 
-            if(fuel > 0){
+            if(fuel > 0 && enabled){
                 heat += fullness * heating * Math.min(delta(), 4f);
 
-                if(timer(timerFuel, itemDuration / timeScale())){
+                if(timer(timerFuel, itemDuration / timeScale)){
                     consume();
                 }
+            }else{
+                productionEfficiency = 0f;
             }
 
             Liquid liquid = cliquid.liquid;
@@ -96,7 +100,7 @@ public class NuclearReactor extends PowerGenerator{
                 float smoke = 1.0f + (heat - smokeThreshold) / (1f - smokeThreshold); //ranges from 1.0 to 2.0
                 if(Mathf.chance(smoke / 20.0 * delta())){
                     Fx.reactorsmoke.at(x + Mathf.range(size * tilesize / 2f),
-                    y + Mathf.random(size * tilesize / 2f));
+                    y + Mathf.range(size * tilesize / 2f));
                 }
             }
 

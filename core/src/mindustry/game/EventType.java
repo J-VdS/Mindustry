@@ -1,6 +1,6 @@
 package mindustry.game;
 
-import arc.util.ArcAnnotate.*;
+import arc.util.*;
 import mindustry.core.GameState.*;
 import mindustry.ctype.*;
 import mindustry.entities.units.*;
@@ -17,25 +17,34 @@ public class EventType{
         phaseDeflectHit,
         impactPower,
         thoriumReactorOverheat,
-        itemLaunch,
         fireExtinguish,
+        acceleratorUse,
         newGame,
         tutorialComplete,
         flameAmmo,
         turretCool,
         enablePixelation,
-        drown,
         exclusionDeath,
         suicideBomb,
         openWiki,
         teamCoreDamage,
         socketConfigChanged,
-        update
+        update,
+        draw,
+        preDraw,
+        postDraw,
+        uiDrawBegin,
+        uiDrawEnd,
+        //before/after bloom used, skybox or planets drawn
+        universeDrawBegin,
+        //skybox drawn and bloom is enabled - use Vars.renderer.planets
+        universeDraw,
+        //planets drawn and bloom disabled
+        universeDrawEnd
     }
 
     public static class WinEvent{}
     public static class LoseEvent{}
-    public static class LaunchEvent{}
     public static class ResizeEvent{}
     public static class MapMakeEvent{}
     public static class MapPublishEvent{}
@@ -55,6 +64,8 @@ public class EventType{
     public static class CoreItemDeliverEvent{}
     /** Called when the player opens info for a specific block.*/
     public static class BlockInfoEvent{}
+    /** Called *after* all content has been initialized. */
+    public static class ContentInitEvent{}
     /** Called when the client game is first loaded. */
     public static class ClientLoadEvent{}
     /** Called when a game begins and the world is loaded. */
@@ -69,6 +80,15 @@ public class EventType{
         }
     }
 
+    /** Called when a sector is destroyed by waves when you're not there. */
+    public static class SectorInvasionEvent{
+        public final Sector sector;
+
+        public SectorInvasionEvent(Sector sector){
+            this.sector = sector;
+        }
+    }
+
     public static class LaunchItemEvent{
         public final ItemStack stack;
 
@@ -77,6 +97,21 @@ public class EventType{
         }
     }
 
+    public static class SectorLaunchEvent{
+        public final Sector sector;
+
+        public SectorLaunchEvent(Sector sector){
+            this.sector = sector;
+        }
+    }
+
+    public static class SchematicCreateEvent{
+        public final Schematic schematic;
+
+        public SchematicCreateEvent(Schematic schematic){
+            this.schematic = schematic;
+        }
+    }
 
     public static class CommandIssueEvent{
         public final Building tile;
@@ -103,27 +138,6 @@ public class EventType{
         public PlayerChatEvent(Player player, String message){
             this.player = player;
             this.message = message;
-        }
-    }
-
-    /** Called when a zone's requirements are met. */
-    public static class ZoneRequireCompleteEvent{
-        public final SectorPreset zoneMet, zoneForMet;
-        public final Objectives.Objective objective;
-
-        public ZoneRequireCompleteEvent(SectorPreset zoneMet, SectorPreset zoneForMet, Objectives.Objective objective){
-            this.zoneMet = zoneMet;
-            this.zoneForMet = zoneForMet;
-            this.objective = objective;
-        }
-    }
-
-    /** Called when a zone's requirements are met. */
-    public static class ZoneConfigureCompleteEvent{
-        public final SectorPreset zone;
-
-        public ZoneConfigureCompleteEvent(SectorPreset zone){
-            this.zone = zone;
         }
     }
 
@@ -166,7 +180,7 @@ public class EventType{
         }
     }
 
-    /** Called when the configures sets a specific block. */
+    /** Called when the player configures a specific building. */
     public static class ConfigEvent{
         public final Building tile;
         public final Player player;
@@ -179,6 +193,45 @@ public class EventType{
         }
     }
 
+    /** Called when a player taps any tile. */
+    public static class TapEvent{
+        public final Player player;
+        public final Tile tile;
+
+        public TapEvent(Player player, Tile tile){
+            this.tile = tile;
+            this.player = player;
+        }
+    }
+
+    public static class PickupEvent{
+        public final Unit carrier;
+        public final @Nullable Unit unit;
+        public final @Nullable Building build;
+
+        public PickupEvent(Unit carrier, Unit unit){
+            this.carrier = carrier;
+            this.unit = unit;
+            this.build = null;
+        }
+
+        public PickupEvent(Unit carrier, Building build){
+            this.carrier = carrier;
+            this.build = build;
+            this.unit = null;
+        }
+    }
+
+    public static class UnitControlEvent{
+        public final Player player;
+        public final @Nullable Unit unit;
+
+        public UnitControlEvent(Player player, @Nullable Unit unit){
+            this.player = player;
+            this.unit = unit;
+        }
+    }
+
     public static class GameOverEvent{
         public final Team winner;
 
@@ -187,11 +240,10 @@ public class EventType{
         }
     }
 
-    /** Called from the logic thread. Do not access graphics here! */
-    public static class BuildinghangeEvent{
+    public static class TileChangeEvent{
         public final Tile tile;
 
-        public BuildinghangeEvent(Tile tile){
+        public TileChangeEvent(Tile tile){
             this.tile = tile;
         }
     }
@@ -222,17 +274,19 @@ public class EventType{
     }
 
     /**
-     * Called when block building begins by placing down the BuildBlock.
-     * The tile's block will nearly always be a BuildBlock.
+     * Called when block building begins by placing down the ConstructBlock.
+     * The tile's block will nearly always be a ConstructBlock.
      */
     public static class BlockBuildBeginEvent{
         public final Tile tile;
         public final Team team;
+        public final @Nullable Unit unit;
         public final boolean breaking;
 
-        public BlockBuildBeginEvent(Tile tile, Team team, boolean breaking){
+        public BlockBuildBeginEvent(Tile tile, Team team, Unit unit, boolean breaking){
             this.tile = tile;
             this.team = team;
+            this.unit = unit;
             this.breaking = breaking;
         }
     }
@@ -242,26 +296,28 @@ public class EventType{
         public final Team team;
         public final @Nullable Unit unit;
         public final boolean breaking;
+        public final @Nullable Object config;
 
-        public BlockBuildEndEvent(Tile tile, @Nullable Unit unit, Team team, boolean breaking){
+        public BlockBuildEndEvent(Tile tile, @Nullable Unit unit, Team team, boolean breaking, @Nullable Object config){
             this.tile = tile;
             this.team = team;
             this.unit = unit;
             this.breaking = breaking;
+            this.config = config;
         }
     }
 
     /**
      * Called when a player or drone begins building something.
-     * This does not necessarily happen when a new BuildBlock is created.
+     * This does not necessarily happen when a new ConstructBlock is created.
      */
     public static class BuildSelectEvent{
         public final Tile tile;
         public final Team team;
-        public final Builderc builder;
+        public final Unit builder;
         public final boolean breaking;
 
-        public BuildSelectEvent(Tile tile, Team team, Builderc builder, boolean breaking){
+        public BuildSelectEvent(Tile tile, Team team, Unit builder, boolean breaking){
             this.tile = tile;
             this.team = team;
             this.builder = builder;
@@ -287,10 +343,30 @@ public class EventType{
         }
     }
 
-    public static class UnitCreateEvent{
+    public static class UnitDrownEvent{
         public final Unit unit;
 
-        public UnitCreateEvent(Unit unit){
+        public UnitDrownEvent(Unit unit){
+            this.unit = unit;
+        }
+    }
+
+    /** Called when a unit is created in a reconstructor or factory. */
+    public static class UnitCreateEvent{
+        public final Unit unit;
+        public final Building spawner;
+
+        public UnitCreateEvent(Unit unit, Building spawner){
+            this.unit = unit;
+            this.spawner = spawner;
+        }
+    }
+
+    /** Called when a unit is dumped from any payload block. */
+    public static class UnitUnloadEvent{
+        public final Unit unit;
+
+        public UnitUnloadEvent(Unit unit){
             this.unit = unit;
         }
     }

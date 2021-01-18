@@ -8,7 +8,8 @@ import arc.input.*;
 public enum Binding implements KeyBind{
     move_x(new Axis(KeyCode.a, KeyCode.d), "general"),
     move_y(new Axis(KeyCode.s, KeyCode.w)),
-    mouse_move(KeyCode.mouseForward),
+    mouse_move(KeyCode.mouseBack),
+    pan(KeyCode.mouseForward),
 
     boost(KeyCode.shiftLeft),
     control(KeyCode.controlLeft),
@@ -57,6 +58,8 @@ public enum Binding implements KeyBind{
     fullscreen(KeyCode.f11),
     pause(KeyCode.space),
     minimap(KeyCode.m),
+    research(KeyCode.b),
+    planet_map(KeyCode.n),
     toggle_menus(KeyCode.c),
     screenshot(KeyCode.p),
     toggle_power_lines(KeyCode.f5),
@@ -66,6 +69,7 @@ public enum Binding implements KeyBind{
     chat_history_prev(KeyCode.up),
     chat_history_next(KeyCode.down),
     chat_scroll(new Axis(KeyCode.scroll)),
+    chat_mode(KeyCode.tab),
     console(KeyCode.f8),
     ;
 

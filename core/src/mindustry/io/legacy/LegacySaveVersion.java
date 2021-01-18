@@ -9,7 +9,7 @@ import mindustry.world.*;
 
 import java.io.*;
 
-import static mindustry.Vars.content;
+import static mindustry.Vars.*;
 
 public abstract class LegacySaveVersion extends SaveVersion{
 
@@ -26,7 +26,6 @@ public abstract class LegacySaveVersion extends SaveVersion{
 
         if(!generating) context.begin();
         try{
-
             context.resize(width, height);
 
             //read floor and create tiles first
@@ -54,14 +53,14 @@ public abstract class LegacySaveVersion extends SaveVersion{
                 if(block == null) block = Blocks.air;
 
                 //occupied by multiblock part
-                boolean occupied = tile.build != null && !tile.isCenter() && (tile.build.block() == block || block == Blocks.air);
+                boolean occupied = tile.build != null && !tile.isCenter() && (tile.build.block == block || block == Blocks.air);
 
                 //do not override occupied cells
                 if(!occupied){
                     tile.setBlock(block);
                 }
 
-                if(block.hasEntity()){
+                if(block.hasBuilding()){
                     try{
                         readChunk(stream, true, in -> {
                             byte version = in.readByte();
@@ -74,10 +73,10 @@ public abstract class LegacySaveVersion extends SaveVersion{
                             tile.setTeam(Team.get(team));
                             tile.build.rotation = rotation;
 
-                            if(tile.build.items != null) tile.build.items.read(Reads.get(stream));
-                            if(tile.build.power != null) tile.build.power.read(Reads.get(stream));
-                            if(tile.build.liquids != null) tile.build.liquids.read(Reads.get(stream));
-                            if(tile.build.cons != null) tile.build.cons.read(Reads.get(stream));
+                            if(tile.build.items != null) tile.build.items.read(Reads.get(stream), true);
+                            if(tile.build.power != null) tile.build.power.read(Reads.get(stream), true);
+                            if(tile.build.liquids != null) tile.build.liquids.read(Reads.get(stream), true);
+                            if(tile.build.cons != null) tile.build.cons.read(Reads.get(stream), true);
 
                             //read only from subclasses!
                             tile.build.read(Reads.get(in), version);
@@ -85,6 +84,8 @@ public abstract class LegacySaveVersion extends SaveVersion{
                     }catch(Throwable e){
                         throw new IOException("Failed to read tile entity of block: " + block, e);
                     }
+
+                    context.onReadBuilding();
                 }else{
                     int consecutives = stream.readUnsignedByte();
 

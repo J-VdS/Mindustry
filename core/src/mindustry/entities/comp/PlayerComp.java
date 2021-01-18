@@ -6,7 +6,6 @@ import arc.graphics.g2d.*;
 import arc.math.*;
 import arc.scene.ui.layout.*;
 import arc.util.*;
-import arc.util.ArcAnnotate.*;
 import arc.util.pooling.*;
 import mindustry.annotations.Annotations.*;
 import mindustry.content.*;
@@ -29,15 +28,17 @@ import static mindustry.Vars.*;
 @EntityDef(value = {Playerc.class}, serialize = false)
 @Component(base = true)
 abstract class PlayerComp implements UnitController, Entityc, Syncc, Timerc, Drawc{
-    static final float deathDelay = 30f;
+    static final float deathDelay = 60f;
 
     @Import float x, y;
 
-    @NonNull @ReadOnly Unit unit = Nulls.unit;
+    @ReadOnly Unit unit = Nulls.unit;
+    transient private Unit lastReadUnit = Nulls.unit;
     transient @Nullable NetConnection con;
 
     @ReadOnly Team team = Team.sharded;
-    @SyncLocal boolean admin, typing, shooting, boosting;
+    @SyncLocal boolean typing, shooting, boosting;
+    boolean admin;
     @SyncLocal float mouseX, mouseY;
     String name = "noname";
     Color color = new Color();
@@ -47,21 +48,21 @@ abstract class PlayerComp implements UnitController, Entityc, Syncc, Timerc, Dra
     transient float textFadeTime;
 
     public boolean isBuilder(){
-        return unit instanceof Builderc;
+        return unit.canBuild();
     }
 
-    public boolean isMiner(){
-        return unit instanceof Minerc;
-    }
-
-    public @Nullable
-    CoreBuild closestCore(){
+    public @Nullable CoreBuild closestCore(){
         return state.teams.closestCore(x, y, team);
     }
 
-    public @Nullable
-    CoreBuild core(){
+    public @Nullable CoreBuild core(){
         return team.core();
+    }
+
+    /** @return largest/closest core, with largest cores getting priority */
+    @Nullable
+    public CoreBuild bestCore(){
+        return team.cores().min(Structs.comps(Structs.comparingInt(c -> -c.block.size), Structs.comparingFloat(c -> c.dst(x, y))));
     }
 
     public TextureRegion icon(){
@@ -71,12 +72,17 @@ abstract class PlayerComp implements UnitController, Entityc, Syncc, Timerc, Dra
         return unit.icon();
     }
 
+    public boolean displayAmmo(){
+        return unit instanceof BlockUnitc || state.rules.unitAmmo;
+    }
+
     public void reset(){
         team = state.rules.defaultTeam;
         admin = typing = false;
         textFadeTime = 0f;
+        x = y = 0f;
         if(!dead()){
-            unit.controller(unit.type().createController());
+            unit.controller(unit.type.createController());
             unit = Nulls.unit;
         }
     }
@@ -88,11 +94,17 @@ abstract class PlayerComp implements UnitController, Entityc, Syncc, Timerc, Dra
 
     @Replace
     public float clipSize(){
-        return unit.isNull() ? 20 : unit.type().hitsize * 2f;
+        return unit.isNull() ? 20 : unit.type.hitSize * 2f;
     }
 
     @Override
     public void afterSync(){
+        //simulate a unit change after sync
+        Unit set = unit;
+        unit = lastReadUnit;
+        unit(set);
+        lastReadUnit = unit;
+
         unit.aim(mouseX, mouseY);
         //this is only necessary when the thing being controlled isn't synced
         unit.controlWeapons(shooting, shooting);
@@ -106,7 +118,7 @@ abstract class PlayerComp implements UnitController, Entityc, Syncc, Timerc, Dra
             clearUnit();
         }
 
-        CoreBuild core = closestCore();
+        CoreBuild core;
 
         if(!dead()){
             set(unit);
@@ -114,17 +126,17 @@ abstract class PlayerComp implements UnitController, Entityc, Syncc, Timerc, Dra
             deathTimer = 0;
 
             //update some basic state to sync things
-            if(unit.type().canBoost){
+            if(unit.type.canBoost){
                 Tile tile = unit.tileOn();
                 unit.elevation = Mathf.approachDelta(unit.elevation, (tile != null && tile.solid()) || boosting ? 1f : 0f, 0.08f);
             }
-        }else if(core != null){
+        }else if((core = bestCore()) != null){
             //have a small delay before death to prevent the camera from jumping around too quickly
-            //(this is not for balance)
+            //(this is not for balance, it just looks better this way)
             deathTimer += Time.delta;
             if(deathTimer >= deathDelay){
                 //request spawn - this happens serverside only
-                core.requestSpawn(base());
+                core.requestSpawn(self());
                 deathTimer = 0;
             }
         }
@@ -154,28 +166,31 @@ abstract class PlayerComp implements UnitController, Entityc, Syncc, Timerc, Dra
         return unit;
     }
 
-    public Minerc miner(){
-        return !(unit instanceof Minerc) ? Nulls.miner : (Minerc)unit;
-    }
-
-    public Builderc builder(){
-        return !(unit instanceof Builderc) ? Nulls.builder : (Builderc)unit;
-    }
-
     public void unit(Unit unit){
         if(unit == null) throw new IllegalArgumentException("Unit cannot be null. Use clearUnit() instead.");
         if(this.unit == unit) return;
+
         if(this.unit != Nulls.unit){
             //un-control the old unit
-            this.unit.controller(this.unit.type().createController());
+            this.unit.controller(this.unit.type.createController());
         }
         this.unit = unit;
         if(unit != Nulls.unit){
             unit.team(team);
             unit.controller(this);
+
+            //this player just became remote, snap the interpolation so it doesn't go wild
+            if(unit.isRemote()){
+                unit.snapInterpolation();
+            }
+
+            //reset selected block when switching units
+            if(!headless && isLocal()){
+                control.input.block = null;
+            }
         }
 
-        Events.fire(new UnitChangeEvent(base(), unit));
+        Events.fire(new UnitChangeEvent(self(), unit));
     }
 
     boolean dead(){
@@ -234,7 +249,7 @@ abstract class PlayerComp implements UnitController, Entityc, Syncc, Timerc, Dra
         }
 
         if(Core.settings.getBool("playerchat") && ((textFadeTime > 0 && lastText != null) || typing)){
-            String text = textFadeTime <= 0 || lastText == null ? "[lightgray]" + Strings.animated(Time.time(), 4, 15f, ".") : lastText;
+            String text = textFadeTime <= 0 || lastText == null ? "[lightgray]" + Strings.animated(Time.time, 4, 15f, ".") : lastText;
             float width = 100f;
             float visualFadeTime = 1f - Mathf.curve(1f - textFadeTime, 0.9f);
             font.setColor(1f, 1f, 1f, textFadeTime <= 0 || lastText == null ? 1f : visualFadeTime);

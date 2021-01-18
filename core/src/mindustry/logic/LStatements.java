@@ -8,10 +8,12 @@ import arc.scene.ui.layout.*;
 import mindustry.*;
 import mindustry.annotations.Annotations.*;
 import mindustry.gen.*;
+import mindustry.graphics.*;
 import mindustry.logic.LCanvas.*;
 import mindustry.logic.LExecutor.*;
 import mindustry.type.*;
 import mindustry.ui.*;
+import mindustry.world.meta.*;
 
 import static mindustry.world.blocks.logic.LogicDisplay.*;
 
@@ -28,8 +30,8 @@ public class LStatements{
         }
 
         @Override
-        public LCategory category(){
-            return LCategory.control;
+        public Color color(){
+            return Pal.logicControl;
         }
 
         @Override
@@ -46,69 +48,13 @@ public class LStatements{
         }
 
         @Override
-        public LCategory category(){
-            return LCategory.operations;
+        public Color color(){
+            return Pal.logicOperations;
         }
 
         @Override
         public LInstruction build(LAssembler builder){
             return new NoopI();
-        }
-    }
-
-    @RegisterStatement("getlink")
-    public static class GetLinkStatement extends LStatement{
-        public String output = "result", address = "0";
-
-        @Override
-        public void build(Table table){
-            field(table, output, str -> output = str);
-
-            table.add(" = link# ");
-
-            field(table, address, str -> address = str);
-        }
-
-        @Override
-        public LCategory category(){
-            return LCategory.io;
-        }
-
-        @Override
-        public LInstruction build(LAssembler builder){
-            return new GetLinkI(builder.var(output), builder.var(address));
-        }
-    }
-
-    @RegisterStatement("write")
-    public static class WriteStatement extends LStatement{
-        public String input = "result", target = "cell1", address = "0";
-
-        @Override
-        public void build(Table table){
-            table.add(" write ");
-
-            field(table, input, str -> input = str);
-
-            table.add(" to ");
-
-            fields(table, target, str -> target = str);
-
-            row(table);
-
-            table.add(" at ");
-
-            field(table, address, str -> address = str);
-        }
-
-        @Override
-        public LCategory category(){
-            return LCategory.io;
-        }
-
-        @Override
-        public LInstruction build(LAssembler builder){
-            return new WriteI(builder.var(target), builder.var(address), builder.var(input));
         }
     }
 
@@ -134,13 +80,45 @@ public class LStatements{
         }
 
         @Override
-        public LCategory category(){
-            return LCategory.io;
+        public Color color(){
+            return Pal.logicIo;
         }
 
         @Override
         public LInstruction build(LAssembler builder){
             return new ReadI(builder.var(target), builder.var(address), builder.var(output));
+        }
+    }
+
+    @RegisterStatement("write")
+    public static class WriteStatement extends LStatement{
+        public String input = "result", target = "cell1", address = "0";
+
+        @Override
+        public void build(Table table){
+            table.add(" write ");
+
+            field(table, input, str -> input = str);
+
+            table.add(" to ");
+
+            fields(table, target, str -> target = str);
+
+            row(table);
+
+            table.add(" at ");
+
+            field(table, address, str -> address = str);
+        }
+
+        @Override
+        public Color color(){
+            return Pal.logicIo;
+        }
+
+        @Override
+        public LInstruction build(LAssembler builder){
+            return new WriteI(builder.var(target), builder.var(address), builder.var(input));
         }
     }
 
@@ -166,6 +144,12 @@ public class LStatements{
                     if(type == GraphicsType.color){
                         p2 = "255";
                     }
+
+                    if(type == GraphicsType.image){
+                        p1 = "@copper";
+                        p2 = "32";
+                        p3 = "0";
+                    }
                     rebuild(table);
                 }, 2, cell -> cell.size(100, 50)));
             }, Styles.logict, () -> {}).size(90, 40).color(table.color).left().padLeft(2);
@@ -179,39 +163,37 @@ public class LStatements{
                 s.setColor(table.color);
 
                 switch(type){
-                    case clear:
+                    case clear -> {
                         fields(s, "r", x, v -> x = v);
                         fields(s, "g", y, v -> y = v);
                         fields(s, "b", p1, v -> p1 = v);
-                        break;
-                    case color:
+                    }
+                    case color -> {
                         fields(s, "r", x, v -> x = v);
                         fields(s, "g", y, v -> y = v);
                         fields(s, "b", p1, v -> p1 = v);
                         row(s);
                         fields(s, "a", p2, v -> p2 = v);
-                        break;
-                    case stroke:
+                    }
+                    case stroke -> {
                         s.add().width(4);
                         fields(s, x, v -> x = v);
-                        break;
-                    case line:
+                    }
+                    case line -> {
                         fields(s, "x", x, v -> x = v);
                         fields(s, "y", y, v -> y = v);
                         row(s);
                         fields(s, "x2", p1, v -> p1 = v);
                         fields(s, "y2", p2, v -> p2 = v);
-                        break;
-                    case rect:
-                    case lineRect:
+                    }
+                    case rect, lineRect -> {
                         fields(s, "x", x, v -> x = v);
                         fields(s, "y", y, v -> y = v);
                         row(s);
                         fields(s, "width", p1, v -> p1 = v);
                         fields(s, "height", p2, v -> p2 = v);
-                        break;
-                    case poly:
-                    case linePoly:
+                    }
+                    case poly, linePoly -> {
                         fields(s, "x", x, v -> x = v);
                         fields(s, "y", y, v -> y = v);
                         row(s);
@@ -219,8 +201,8 @@ public class LStatements{
                         fields(s, "radius", p2, v -> p2 = v);
                         row(s);
                         fields(s, "rotation", p3, v -> p3 = v);
-                        break;
-                    case triangle:
+                    }
+                    case triangle -> {
                         fields(s, "x", x, v -> x = v);
                         fields(s, "y", y, v -> y = v);
                         row(s);
@@ -229,7 +211,16 @@ public class LStatements{
                         row(s);
                         fields(s, "x3", p3, v -> p3 = v);
                         fields(s, "y3", p4, v -> p4 = v);
-                        break;
+                    }
+                    case image -> {
+                        fields(s, "x", x, v -> x = v);
+                        fields(s, "y", y, v -> y = v);
+                        row(s);
+                        fields(s, "image", p1, v -> p1 = v);
+                        fields(s, "size", p2, v -> p2 = v);
+                        row(s);
+                        fields(s, "rotation", p3, v -> p3 = v);
+                    }
                 }
             }).expand().left();
         }
@@ -243,34 +234,13 @@ public class LStatements{
         }
 
         @Override
-        public LCategory category(){
-            return LCategory.io;
+        public Color color(){
+            return Pal.logicIo;
         }
 
         @Override
         public LInstruction build(LAssembler builder){
             return new DrawI((byte)type.ordinal(), 0, builder.var(x), builder.var(y), builder.var(p1), builder.var(p2), builder.var(p3), builder.var(p4));
-        }
-    }
-
-    @RegisterStatement("drawflush")
-    public static class DrawFlushStatement extends LStatement{
-        public String target = "display1";
-
-        @Override
-        public void build(Table table){
-            table.add(" to ");
-            field(table, target, str -> target = str);
-        }
-
-        @Override
-        public LCategory category(){
-            return LCategory.blocks;
-        }
-
-        @Override
-        public LInstruction build(LAssembler builder){
-            return new DrawFlushI(builder.var(target));
         }
     }
 
@@ -289,8 +259,29 @@ public class LStatements{
         }
 
         @Override
-        public LCategory category(){
-            return LCategory.control;
+        public Color color(){
+            return Pal.logicIo;
+        }
+    }
+
+    @RegisterStatement("drawflush")
+    public static class DrawFlushStatement extends LStatement{
+        public String target = "display1";
+
+        @Override
+        public void build(Table table){
+            table.add(" to ");
+            field(table, target, str -> target = str);
+        }
+
+        @Override
+        public Color color(){
+            return Pal.logicBlocks;
+        }
+
+        @Override
+        public LInstruction build(LAssembler builder){
+            return new DrawFlushI(builder.var(target));
         }
     }
 
@@ -305,13 +296,37 @@ public class LStatements{
         }
 
         @Override
-        public LCategory category(){
-            return LCategory.blocks;
+        public Color color(){
+            return Pal.logicBlocks;
         }
 
         @Override
         public LInstruction build(LAssembler builder){
             return new PrintFlushI(builder.var(target));
+        }
+    }
+
+    @RegisterStatement("getlink")
+    public static class GetLinkStatement extends LStatement{
+        public String output = "result", address = "0";
+
+        @Override
+        public void build(Table table){
+            field(table, output, str -> output = str);
+
+            table.add(" = link# ");
+
+            field(table, address, str -> address = str);
+        }
+
+        @Override
+        public Color color(){
+            return Pal.logicBlocks;
+        }
+
+        @Override
+        public LInstruction build(LAssembler builder){
+            return new GetLinkI(builder.var(output), builder.var(address));
         }
     }
 
@@ -349,17 +364,17 @@ public class LStatements{
             //Q: why don't you just use arrays for this?
             //A: arrays aren't as easy to serialize so the code generator doesn't handle them
             int c = 0;
-            for(int i = 0; i < type.parameters.length; i++){
+            for(int i = 0; i < type.params.length; i++){
 
-                fields(table, type.parameters[i], i == 0 ? p1 : i == 1 ? p2 : i == 2 ? p3 : p4, i == 0 ? v -> p1 = v : i == 1 ? v -> p2 = v : i == 2 ? v -> p3 = v : v -> p4 = v);
+                fields(table, type.params[i], i == 0 ? p1 : i == 1 ? p2 : i == 2 ? p3 : p4, i == 0 ? v -> p1 = v : i == 1 ? v -> p2 = v : i == 2 ? v -> p3 = v : v -> p4 = v);
 
                 if(++c % 2 == 0) row(table);
             }
         }
 
         @Override
-        public LCategory category(){
-            return LCategory.blocks;
+        public Color color(){
+            return Pal.logicBlocks;
         }
 
         @Override
@@ -372,17 +387,19 @@ public class LStatements{
     public static class RadarStatement extends LStatement{
         public RadarTarget target1 = RadarTarget.enemy, target2 = RadarTarget.any, target3 = RadarTarget.any;
         public RadarSort sort = RadarSort.distance;
-        public String radar = "turret1", sortOrder = "0", output = "result";
+        public String radar = "turret1", sortOrder = "1", output = "result";
 
         @Override
         public void build(Table table){
             table.defaults().left();
 
-            table.add(" from ");
+            if(buildFrom()){
+                table.add(" from ");
 
-            fields(table, radar, v -> radar = v);
+                fields(table, radar, v -> radar = v);
 
-            row(table);
+                row(table);
+            }
 
             for(int i = 0; i < 3; i++){
                 int fi = i;
@@ -422,9 +439,13 @@ public class LStatements{
             fields(table, output, v -> output = v);
         }
 
+        public boolean buildFrom(){
+            return true;
+        }
+
         @Override
-        public LCategory category(){
-            return LCategory.blocks;
+        public Color color(){
+            return Pal.logicBlocks;
         }
 
         @Override
@@ -507,7 +528,9 @@ public class LStatements{
 
                             stack.clearChildren();
                             stack.addChild(tables[selected]);
-                            t.pack();
+
+                            t.parent.parent.pack();
+                            t.parent.parent.invalidateHierarchy();
                         }).size(80f, 50f).growX().checked(selected == fi).group(group);
                     }
                     t.row();
@@ -526,8 +549,8 @@ public class LStatements{
         }
 
         @Override
-        public LCategory category(){
-            return LCategory.blocks;
+        public Color color(){
+            return Pal.logicBlocks;
         }
 
         @Override
@@ -551,8 +574,8 @@ public class LStatements{
         }
 
         @Override
-        public LCategory category(){
-            return LCategory.operations;
+        public Color color(){
+            return Pal.logicOperations;
         }
 
         @Override
@@ -561,67 +584,56 @@ public class LStatements{
         }
     }
 
-    @RegisterStatement("bop")
-    public static class BinaryOpStatement extends LStatement{
-        public BinaryOp op = BinaryOp.add;
-        public String a = "a", b = "b", dest = "result";
+    @RegisterStatement("op")
+    public static class OperationStatement extends LStatement{
+        public LogicOp op = LogicOp.add;
+        public String dest = "result", a = "a", b = "b";
 
         @Override
         public void build(Table table){
+            rebuild(table);
+        }
+
+        void rebuild(Table table){
+            table.clearChildren();
+
             field(table, dest, str -> dest = str);
 
             table.add(" = ");
 
-            row(table);
+            if(op.unary){
+                opButton(table);
 
-            field(table, a, str -> a = str);
+                field(table, a, str -> a = str);
+            }else{
+                row(table);
 
+                field(table, a, str -> a = str);
+
+                opButton(table);
+
+                field(table, b, str -> b = str);
+            }
+        }
+
+        void opButton(Table table){
             table.button(b -> {
                 b.label(() -> op.symbol);
-                b.clicked(() -> showSelect(b, BinaryOp.all, op, o -> op = o));
+                b.clicked(() -> showSelect(b, LogicOp.all, op, o -> {
+                    op = o;
+                    rebuild(table);
+                }));
             }, Styles.logict, () -> {}).size(60f, 40f).pad(4f).color(table.color);
-
-            field(table, b, str -> b = str);
         }
 
         @Override
         public LInstruction build(LAssembler builder){
-            return new BinaryOpI(op,builder.var(a), builder.var(b), builder.var(dest));
+            return new OpI(op,builder.var(a), builder.var(b), builder.var(dest));
         }
 
         @Override
-        public LCategory category(){
-            return LCategory.operations;
-        }
-    }
-
-    @RegisterStatement("uop")
-    public static class UnaryOpStatement extends LStatement{
-        public UnaryOp op = UnaryOp.negate;
-        public String value = "b", dest = "result";
-
-        @Override
-        public void build(Table table){
-            field(table, dest, str -> dest = str);
-
-            table.add(" = ");
-
-            table.button(b -> {
-                b.label(() -> op.symbol);
-                b.clicked(() -> showSelect(b, UnaryOp.all, op, o -> op = o));
-            }, Styles.logict, () -> {}).size(50f, 40f).pad(3f).color(table.color);
-
-            field(table, value, str -> value = str);
-        }
-
-        @Override
-        public LInstruction build(LAssembler builder){
-            return new UnaryOpI(op, builder.var(value), builder.var(dest));
-        }
-
-        @Override
-        public LCategory category(){
-            return LCategory.operations;
+        public Color color(){
+            return Pal.logicOperations;
         }
     }
 
@@ -638,13 +650,15 @@ public class LStatements{
         }
 
         @Override
-        public LCategory category(){
-            return LCategory.control;
+        public Color color(){
+            return Pal.logicControl;
         }
     }
 
     @RegisterStatement("jump")
     public static class JumpStatement extends LStatement{
+        private static Color last = new Color();
+
         public transient StatementElem dest;
 
         public int destIndex;
@@ -656,17 +670,28 @@ public class LStatements{
         public void build(Table table){
             table.add("if ").padLeft(4);
 
-            field(table, value, str -> value = str);
+            last = table.color;
+            table.table(this::rebuild);
+
+            table.add().growX();
+            table.add(new JumpButton(() -> dest, s -> dest = s)).size(30).right().padLeft(-8);
+        }
+
+        void rebuild(Table table){
+            table.clearChildren();
+            table.setColor(last);
+
+            if(op != ConditionOp.always) field(table, value, str -> value = str);
 
             table.button(b -> {
                 b.label(() -> op.symbol);
-                b.clicked(() -> showSelect(b, ConditionOp.all, op, o -> op = o));
-            }, Styles.logict, () -> {}).size(48f, 40f).pad(4f).color(table.color);
+                b.clicked(() -> showSelect(b, ConditionOp.all, op, o -> {
+                    op = o;
+                    rebuild(table);
+                }));
+            }, Styles.logict, () -> {}).size(op == ConditionOp.always ? 80f : 48f, 40f).pad(4f).color(table.color);
 
-            field(table, compare, str -> compare = str);
-
-            table.add().growX();
-            table.add(new JumpButton(Color.white, () -> dest, s -> dest = s)).size(30).right().padLeft(-8);
+            if(op != ConditionOp.always) field(table, compare, str -> compare = str);
         }
 
         //elements need separate conversion logic
@@ -690,8 +715,237 @@ public class LStatements{
         }
 
         @Override
-        public LCategory category(){
-            return LCategory.control;
+        public Color color(){
+            return Pal.logicControl;
+        }
+    }
+
+    @RegisterStatement("ubind")
+    public static class UnitBindStatement extends LStatement{
+        public String type = "@poly";
+
+        @Override
+        public void build(Table table){
+            table.add(" type ");
+
+            TextField field = field(table, type, str -> type = str).get();
+
+            table.button(b -> {
+                b.image(Icon.pencilSmall);
+                b.clicked(() -> showSelectTable(b, (t, hide) -> {
+                    t.row();
+                    t.table(i -> {
+                        i.left();
+                        int c = 0;
+                        for(UnitType item : Vars.content.units()){
+                            if(!item.unlockedNow() || item.isHidden()) continue;
+                            i.button(new TextureRegionDrawable(item.icon(Cicon.small)), Styles.cleari, () -> {
+                                type = "@" + item.name;
+                                field.setText(type);
+                                hide.run();
+                            }).size(40f).get().resizeImage(Cicon.small.size);
+
+                            if(++c % 6 == 0) i.row();
+                        }
+                    }).colspan(3).width(240f).left();
+                }));
+            }, Styles.logict, () -> {}).size(40f).padLeft(-2).color(table.color);
+        }
+
+        @Override
+        public Color color(){
+            return Pal.logicUnits;
+        }
+
+        @Override
+        public LInstruction build(LAssembler builder){
+            return new UnitBindI(builder.var(type));
+        }
+    }
+
+    @RegisterStatement("ucontrol")
+    public static class UnitControlStatement extends LStatement{
+        public LUnitControl type = LUnitControl.move;
+        public String p1 = "0", p2 = "0", p3 = "0", p4 = "0", p5 = "0";
+
+        @Override
+        public void build(Table table){
+            rebuild(table);
+        }
+
+        void rebuild(Table table){
+            table.clearChildren();
+
+            table.left();
+
+            table.add(" ");
+
+            table.button(b -> {
+                b.label(() -> type.name());
+                b.clicked(() -> showSelect(b, LUnitControl.all, type, t -> {
+                    type = t;
+                    rebuild(table);
+                }, 2, cell -> cell.size(120, 50)));
+            }, Styles.logict, () -> {}).size(120, 40).color(table.color).left().padLeft(2);
+
+            row(table);
+
+            //Q: why don't you just use arrays for this?
+            //A: arrays aren't as easy to serialize so the code generator doesn't handle them
+            int c = 0;
+            for(int i = 0; i < type.params.length; i++){
+
+                fields(table, type.params[i], i == 0 ? p1 : i == 1 ? p2 : i == 2 ? p3 : i == 3 ? p4 : p5, i == 0 ? v -> p1 = v : i == 1 ? v -> p2 = v : i == 2 ? v -> p3 = v : i == 3 ? v -> p4 = v : v -> p5 = v).width(100f);
+
+                if(++c % 2 == 0) row(table);
+
+                if(i == 3){
+                    table.row();
+                }
+            }
+        }
+
+        @Override
+        public Color color(){
+            return Pal.logicUnits;
+        }
+
+        @Override
+        public LInstruction build(LAssembler builder){
+            return new UnitControlI(type, builder.var(p1), builder.var(p2), builder.var(p3), builder.var(p4), builder.var(p5));
+        }
+    }
+
+    @RegisterStatement("uradar")
+    public static class UnitRadarStatement extends RadarStatement{
+
+        public UnitRadarStatement(){
+            radar = "0";
+        }
+
+        @Override
+        public boolean buildFrom(){
+            //do not build the "from" section
+            return false;
+        }
+
+        @Override
+        public Color color(){
+            return Pal.logicUnits;
+        }
+
+        @Override
+        public LInstruction build(LAssembler builder){
+            return new RadarI(target1, target2, target3, sort, LExecutor.varUnit, builder.var(sortOrder), builder.var(output));
+        }
+    }
+
+    @RegisterStatement("ulocate")
+    public static class UnitLocateStatement extends LStatement{
+        public LLocate locate = LLocate.building;
+        public BlockFlag flag = BlockFlag.core;
+        public String enemy = "true", ore = "@copper";
+        public String outX = "outx", outY = "outy", outFound = "found", outBuild = "building";
+
+        @Override
+        public void build(Table table){
+            rebuild(table);
+        }
+
+        void rebuild(Table table){
+            table.clearChildren();
+
+            table.add(" find ").left();
+
+            table.button(b -> {
+                b.label(() -> locate.name());
+                b.clicked(() -> showSelect(b, LLocate.all, locate, t -> {
+                    locate = t;
+                    rebuild(table);
+                }, 2, cell -> cell.size(110, 50)));
+            }, Styles.logict, () -> {}).size(110, 40).color(table.color).left().padLeft(2);
+
+            switch(locate){
+                case building -> {
+                    row(table);
+                    table.add(" type ").left();
+                    table.button(b -> {
+                        b.label(() -> flag.name());
+                        b.clicked(() -> showSelect(b, BlockFlag.all, flag, t -> flag = t, 2, cell -> cell.size(110, 50)));
+                    }, Styles.logict, () -> {}).size(110, 40).color(table.color).left().padLeft(2);
+                    row(table);
+
+                    table.add(" enemy ").left();
+
+                    fields(table, enemy, str -> enemy = str);
+
+                    table.row();
+                }
+
+                case ore -> {
+                    table.add(" ore ").left();
+                    table.table(ts -> {
+                        ts.color.set(table.color);
+
+                        fields(ts, ore, str -> ore = str);
+
+                        ts.button(b -> {
+                            b.image(Icon.pencilSmall);
+                            b.clicked(() -> showSelectTable(b, (t, hide) -> {
+                                t.row();
+                                t.table(i -> {
+                                    i.left();
+                                    int c = 0;
+                                    for(Item item : Vars.content.items()){
+                                        if(!item.unlockedNow()) continue;
+                                        i.button(new TextureRegionDrawable(item.icon(Cicon.small)), Styles.cleari, () -> {
+                                            ore = "@" + item.name;
+                                            rebuild(table);
+                                            hide.run();
+                                        }).size(40f).get().resizeImage(Cicon.small.size);
+
+                                        if(++c % 6 == 0) i.row();
+                                    }
+                                }).colspan(3).width(240f).left();
+                            }));
+                        }, Styles.logict, () -> {}).size(40f).padLeft(-2).color(table.color);
+                    });
+
+
+                    table.row();
+                }
+
+                case spawn, damaged -> {
+                    table.row();
+                }
+            }
+
+            table.add(" outX ").left();
+            fields(table, outX, str -> outX = str);
+
+            table.add(" outY ").left();
+            fields(table, outY, str -> outY = str);
+
+            row(table);
+
+            table.add(" found ").left();
+            fields(table, outFound, str -> outFound = str);
+
+            if(locate != LLocate.ore){
+                table.add(" building ").left();
+                fields(table, outBuild, str -> outBuild = str);
+            }
+
+        }
+
+        @Override
+        public Color color(){
+            return Pal.logicUnits;
+        }
+
+        @Override
+        public LInstruction build(LAssembler builder){
+            return new UnitLocateI(locate, flag, builder.var(enemy), builder.var(ore), builder.var(outX), builder.var(outY), builder.var(outFound), builder.var(outBuild));
         }
     }
 }
