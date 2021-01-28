@@ -204,7 +204,6 @@ public class DesktopInput extends InputHandler{
             if(input.keyDown(Binding.mouse_move)){
                 panCam = true;
             }
-            panning = false;
 
             Core.camera.position.add(Tmp.v1.setZero().add(Core.input.axis(Binding.move_x), Core.input.axis(Binding.move_y)).nor().scl(camSpeed));
         }else if(!player.dead() && !panning){
@@ -251,7 +250,7 @@ public class DesktopInput extends InputHandler{
 
         //zoom camera
         if((!Core.scene.hasScroll() || Core.input.keyDown(Binding.diagonal_placement)) && !ui.chatfrag.shown() && Math.abs(Core.input.axisTap(Binding.zoom)) > 0
-            && !Core.input.keyDown(Binding.rotateplaced) && (Core.input.keyDown(Binding.diagonal_placement) || ((!isPlacing() || !block.rotate) && selectRequests.isEmpty()))){
+            && !Core.input.keyDown(Binding.rotateplaced) && (Core.input.keyDown(Binding.diagonal_placement) || ((!player.isBuilder() || !isPlacing() || !block.rotate) && selectRequests.isEmpty()))){
             renderer.scaleCamera(Core.input.axisTap(Binding.zoom));
         }
 
@@ -374,7 +373,7 @@ public class DesktopInput extends InputHandler{
         int cursorY = tileY(Core.input.mouseY());
         int rawCursorX = World.toTile(Core.input.mouseWorld().x), rawCursorY = World.toTile(Core.input.mouseWorld().y);
 
-        // automatically pause building if the current build queue is empty
+        //automatically pause building if the current build queue is empty
         if(Core.settings.getBool("buildautopause") && isBuilding && !player.unit().isBuilding()){
             isBuilding = false;
             buildWasAutoPaused = true;
